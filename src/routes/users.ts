@@ -23,6 +23,8 @@ router.route('/create')
         res.redirect('/users/list');
     });
 router.route('/search').get((req: Request, res: Response) => {
+    res.render('users/search');
+}).post(async (req: Request, res: Response) => {
     const {search} = req.body;
     let searchArray = search.split(" ");
     let regex = [];
@@ -33,7 +35,7 @@ router.route('/search').get((req: Request, res: Response) => {
     }
     console.log(regex);
 
-    Users.aggregate([{
+    await Users.aggregate([{
         $lookup: {
             from: "addresses", // collection name in db
             localField: "_id",
@@ -53,7 +55,22 @@ router.route('/search').get((req: Request, res: Response) => {
                 err
             });
         }
-        res.send({ users });
+        let resultArr = [];
+        var obj = {};
+        for(let index = 0; index < users.length;index++){
+            
+            for(let inner in users[index]){
+                if(inner === "addresses"){
+                    obj["address"] = users[index][inner][0].address;
+                } else{
+                    obj[inner] = users[index][inner];
+                }
+            }
+            resultArr.push(obj);
+            obj = {};
+        }
+        //res.send(resultArr);
+        res.render('users/list', { users: resultArr });
     });
 
 });
@@ -61,8 +78,38 @@ router.route('/search').get((req: Request, res: Response) => {
 
 router.route('/list')
     .get(async (req: Request, res: Response) => {
-        const users = await Users.find();
-        res.render('users/list', { users });
+        await Users.aggregate([{
+            $lookup: {
+                from: "addresses", // collection name in db
+                localField: "_id",
+                foreignField: "user_id",
+                as: "addresses"
+            }
+        }
+        ]).exec(function(err, users) {
+            if (err) {
+                return res.status(500).json({
+                    ok: false,
+                    err
+                });
+            }
+            let resultArr = [];
+            var obj = {};
+            for(let index = 0; index < users.length;index++){
+                
+                for(let inner in users[index]){
+                    if(inner === "addresses"){
+                        obj["address"] = users[index][inner][0].address;
+                    } else{
+                        obj[inner] = users[index][inner];
+                    }
+                }
+                resultArr.push(obj);
+                obj = {};
+            }
+            //res.send(resultArr);
+            res.render('users/list', { users: resultArr });
+        });
     });
 
 router.route('/delete/:id')
